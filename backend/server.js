@@ -9,12 +9,22 @@ const multer = require('multer');
 const crypto = require('crypto');
 const fs = require('fs');
 const CertificateArtifact = require('../blockchain/build/contracts/Certificate.json');
+const cors = require('cors');
 
 // Load environment variables from .env file
 dotenv.config();
 
+
+
 const app = express();
 const port = process.env.PORT || 5000;
+
+// Middleware for cross-origin access
+app.use(cors({
+  origin:'http://localhost:5173',
+  credentials:true,
+  
+}))
 
 // Middleware for parsing JSON and handling file uploads
 app.use(bodyParser.json());
@@ -80,6 +90,7 @@ app.post('/upload', async (req, res) => {
     fs.renameSync(file.path, filePath);
 
     const fileHash = crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
+    console.log("Success");
 
     res.json({ fileHash });
   } catch (error) {
