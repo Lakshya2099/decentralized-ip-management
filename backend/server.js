@@ -2,8 +2,12 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
-const Web3 = require('web3'); // Correct import of Web3
+const path = require('path');
+const Web3 = require('web3');
 const contract = require('@truffle/contract');
+const multer = require('multer');
+const crypto = require('crypto');
+const fs = require('fs');
 const CertificateArtifact = require('../blockchain/build/contracts/Certificate.json');
 
 // Load environment variables from .env file
@@ -12,8 +16,12 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 5000;
 
-// Use body-parser middleware to parse JSON requests
+// Middleware for parsing JSON and handling file uploads
 app.use(bodyParser.json());
+app.use(multer({ dest: 'uploads/' }).single('document'));
+
+// Serve static files from the 'frontend/public' directory
+app.use(express.static(path.join(__dirname, '../frontend/public')));
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGO_URI, {
@@ -31,7 +39,7 @@ const CertificateSchema = new mongoose.Schema({
 const Certificate = mongoose.model('Certificate', CertificateSchema);
 
 // Initialize Web3
-const web3 = new Web3(new Web3.providers.HttpProvider('http://127.0.0.1:8545')); // Ensure this matches your Ganache instance
+const web3 = new Web3(process.env.GANACHE_URI || 'http://localhost:8545');
 
 // Set up the smart contract
 const CertificateContract = contract(CertificateArtifact);
@@ -58,8 +66,47 @@ app.post('/register', async (req, res) => {
 
     res.send('Certificate registered successfully.');
   } catch (error) {
-    console.error(error);
+    console.error('Error in /register route:', error);
     res.status(500).send('Error registering certificate.');
+  }
+});
+
+app.post('/upload', async (req, res) => {
+  const { file } = req;
+  if (!file) return res.status(400).send('No file uploaded.');
+
+  try {
+    const filePath = path.join(__dirname, 'uploads', file.originalname);
+    fs.renameSync(file.path, filePath);
+
+    const fileHash = crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
+
+    res.json({ fileHash });
+  } catch (error) {
+    console.error('Error in /upload route:', error);
+    res.status(500).send('Error uploading document.');
+  }
+});
+
+app.post('/verify', async (req, res) => {
+  const { hash } = req.body;
+
+  try {
+    const certInstance = await CertificateContract.deployed();
+    const cert = await certInstance.getCertificate(hash);
+
+    if (cert[0] === '') {
+      res.status(404).send('Certificate not found.');
+    } else {
+      res.json({
+        ipHash: cert[0],
+        owner: cert[1],
+        timestamp: new Date(cert[2] * 1000),
+      });
+    }
+  } catch (error) {
+    console.error('Error in /verify route:', error);
+    res.status(500).send('Error verifying document.');
   }
 });
 

@@ -1,30 +1,30 @@
-// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
 contract Certificate {
-    struct Cert {
+    struct CertificateDetails {
         string ipHash;
         address owner;
-        uint256 timestamp;
+        uint timestamp;
     }
 
-    mapping(string => Cert) public certificates;
+    mapping(string => CertificateDetails) public certificates;
 
-    event CertificateRegistered(string ipHash, address owner, uint256 timestamp);
+    event CertificateRegistered(string ipHash, address owner);
 
-    function registerCertificate(string memory ipHash) public {
-        require(bytes(certificates[ipHash].ipHash).length == 0, "Certificate already exists.");
+    function registerCertificate(string memory _ipHash) public {
+        require(certificates[_ipHash].owner == address(0), "Certificate already registered");
 
-        certificates[ipHash] = Cert(ipHash, msg.sender, block.timestamp);
+        certificates[_ipHash] = CertificateDetails({
+            ipHash: _ipHash,
+            owner: msg.sender,
+            timestamp: block.timestamp
+        });
 
-        emit CertificateRegistered(ipHash, msg.sender, block.timestamp);
+        emit CertificateRegistered(_ipHash, msg.sender);
     }
 
-    function getCertificate(string memory ipHash) public view returns (string memory, address, uint256) {
-        require(bytes(certificates[ipHash].ipHash).length != 0, "Certificate does not exist.");
-
-        Cert memory cert = certificates[ipHash];
-
+    function getCertificate(string memory _ipHash) public view returns (string memory, address, uint) {
+        CertificateDetails memory cert = certificates[_ipHash];
         return (cert.ipHash, cert.owner, cert.timestamp);
     }
 }
